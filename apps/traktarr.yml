@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# Title:      PGBlitz (Reference Title File)
+# Author(s):  Admin9705
+# URL:        https://pgblitz.com - http://github.pgblitz.com
+# GNU:        General Public License v3.0
+################################################################################
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    # FACTS #######################################################################
+    - name: 'Set Known Facts'
+      set_fact:
+        pgrole: 'traktarr'
+        image: 'eafxx/traktarr'
+
+    # CORE (MANDATORY) ############################################################
+    - name: 'Including cron job'
+      include_tasks: '/opt/coreapps/apps/_core.yml'
+    - name: 'Including plugins '
+      include_tasks: '/opt/coreapps/apps/_plugins.yml'
+    - name: 'Checking for existing app data'
+      stat:
+        path: /opt/appdata/{{pgrole}}/config.ini
+      register: confcheck
+
+    # LABELS ######################################################################
+    - name: 'Setting {{pgrole}} Volumes'
+      set_fact:
+        pg_volumes:
+          - '/opt/appdata/{{pgrole}}:/config'
+
+    - name: 'Setting {{pgrole}} ENV'
+      set_fact:
+        pg_env:
+          PUID: '1000'
+          PGID: '1000'
+          TZ: 'US/Pacific'
+          DELAY: '2.5'
+          SORT: 'rating'
+          NOSEARCH: 'yes'
+          NOTIFICATIONS: 'yes'
+          BLACKLIST: 'yes'
+          RUNNOW: 'yes'
+          SKIPUPDATE: 'no'
+          APP_BRANCH: 'master'
+
+    # MAIN DEPLOYMENT #############################################################
+    - name: 'Deploying {{pgrole}}'
+      docker_container:
+        name: '{{pgrole}}'
+        image: '{{image}}'
+        pull: yes
+        volumes: '{{pg_volumes}}'
+        env: '{{pg_env}}'
+        restart_policy: unless-stopped
+        networks:
+          - name: plexguide
+            aliases:
+              - '{{pgrole}}'
+        state: started
+        labels: '{{pg_labels}}'
+
+    # Undeployed ########################################################################
+    - name: 'Configuring {{pgrole}} for first time use'
+      block:
+        - name: 'Waiting for {{pgrole}} to start'
+          wait_for:
+            path: '/opt/appdata/{{pgrole}}/config.ini'
+            state: present
+        - name: 'Stop Container'
+          docker_container:
+            name: '{{pgrole}}'
+            state: stopped
+        - name: 'Restart {{pgrole}}'
+          docker_container:
+            name: '{{pgrole}}'
+            state: started
+      when: not confcheck.stat.exists
+
+    - name: 'Update {{pgrole}} for first time use'
+      block:
+        - pause:
+            prompt: "Wait for {{pgrole}} start up"
+            seconds: 5
+
+        - name: 'update {{pgrole}}'
+          shell: 'docker exec {{pgrole}} apk update && docker exec {{pgrole}} apk upgrade'
+
+        - name: 'pip update for {{pgrole}}'
+          shell: 'docker exec {{pgrole}} pip install --upgrade PIP'
+
+        - name: 'pip install jsonrpclib-pelix for {{pgrole}}'
+          shell: 'docker exec {{pgrole}} pip install jsonrpclib-pelix'
+
+      when: confcheck.stat.exists
