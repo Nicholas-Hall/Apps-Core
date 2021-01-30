@@ -49,7 +49,8 @@
           - '{{path.stdout}}:{{path.stdout}}'
           - '/opt/appdata/{{pgrole}}:/config'
           - '/opt/appdata/{{pgrole}}/mp4_automator:/config_mp4_automator'
-          
+          - '/mnt/unionfs:/mnt/unionfs'
+
     - name: 'Setting {{pgrole}} ENV'
       set_fact:
         pg_env:
