@@ -60,7 +60,6 @@
             aliases:
               - '{{pgrole}}'
         state: started
-        labels: '{{pg_labels}}'
 
     # Undeployed ########################################################################
     - name: 'Configuring {{pgrole}} for first time use'
